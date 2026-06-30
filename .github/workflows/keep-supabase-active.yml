@@ -1,0 +1,39 @@
+name: Keep Supabase Active
+
+on:
+  schedule:
+    - cron: "17 9 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Supabase Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query payment request table
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY GitHub secret."
+            exit 1
+          fi
+
+          code="$(
+            curl --silent --show-error --output /tmp/supabase-ping.json --write-out "%{http_code}" \
+              "${SUPABASE_URL%/}/rest/v1/payment_requests?select=id&limit=1" \
+              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"
+          )"
+
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "Supabase ping failed with HTTP ${code}."
+            cat /tmp/supabase-ping.json
+            exit 1
+          fi
+
+          echo "Supabase ping succeeded."
