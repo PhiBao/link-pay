@@ -8,6 +8,7 @@ import {
   Check,
   Copy,
   LinkSimple,
+  PaperPlaneRight,
   SignOut,
 } from "@phosphor-icons/react";
 import { useApp } from "@/components/providers/AppProvider";
@@ -16,6 +17,7 @@ import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Spinner";
 import { formatUSD } from "@/utils/formatCurrency";
 import { normalizePaymentAmount, shortAddress } from "@/utils/paymentRequest";
+import { isAddress } from "ethers";
 
 export function HomeScreen() {
   const {
@@ -25,6 +27,10 @@ export function HomeScreen() {
     logout,
     paymentActivity,
     refreshBalance,
+    sendError,
+    sendStage,
+    sendUSDC,
+    resetSend,
     user,
   } = useApp();
   const [amount, setAmount] = useState("");
@@ -33,6 +39,11 @@ export function HomeScreen() {
   const [isCreating, setIsCreating] = useState(false);
   const [createdUrl, setCreatedUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copiedAddr, setCopiedAddr] = useState(false);
+
+  const [sendAddr, setSendAddr] = useState("");
+  const [sendAmt, setSendAmt] = useState("");
+  const [sendErr, setSendErr] = useState("");
 
   const amountPreview = useMemo(() => {
     try {
@@ -84,6 +95,27 @@ export function HomeScreen() {
     }
     await copyLink();
   }
+
+  async function handleSend() {
+    setSendErr("");
+    resetSend();
+    if (!isAddress(sendAddr)) {
+      setSendErr("Invalid address");
+      return;
+    }
+    const amt = sendAmt.trim();
+    if (!amt || isNaN(Number(amt)) || Number(amt) <= 0) {
+      setSendErr("Enter a valid amount");
+      return;
+    }
+    await sendUSDC(amt, sendAddr);
+    if (sendStage === "success") {
+      setSendAddr("");
+      setSendAmt("");
+    }
+  }
+
+  const isSending = sendStage === "sending";
 
   return (
     <motion.div
@@ -137,9 +169,23 @@ export function HomeScreen() {
               <ArrowClockwise size={18} weight="bold" />
             </button>
           </div>
-          <p className="text-xs text-zinc-400">
-            Wallet {user?.eoaAddress ? shortAddress(user.eoaAddress) : ""}
-          </p>
+          {user?.eoaAddress && (
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(user.eoaAddress).then(() => {
+                  setCopiedAddr(true);
+                  setTimeout(() => setCopiedAddr(false), 1600);
+                });
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1.5 text-xs font-mono text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+            >
+              {copiedAddr ? (
+                <><Check size={13} weight="bold" /> Copied</>
+              ) : (
+                <><Copy size={13} weight="bold" /> {shortAddress(user.eoaAddress)}</>
+              )}
+            </button>
+          )}
         </section>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -214,6 +260,54 @@ export function HomeScreen() {
             </div>
           </motion.div>
         )}
+
+        <section className="mt-8 rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="mb-4 flex items-center gap-2">
+            <PaperPlaneRight size={16} weight="bold" className="text-zinc-500" />
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Send USDC</h2>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Input
+              label="To address"
+              placeholder="0x..."
+              value={sendAddr}
+              onChange={(e) => { setSendAddr(e.target.value); setSendErr(""); }}
+            />
+            <Input
+              label="Amount"
+              type="number"
+              inputMode="decimal"
+              min="0.01"
+              step="0.01"
+              placeholder="10.00"
+              value={sendAmt}
+              onChange={(e) => { setSendAmt(e.target.value); setSendErr(""); }}
+            />
+          </div>
+          {sendErr && (
+            <div className="mt-3 rounded-[1rem] bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+              {sendErr}
+            </div>
+          )}
+          {sendStage === "error" && (
+            <div className="mt-3 rounded-[1rem] bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+              {sendError || "Send failed"}
+            </div>
+          )}
+          {sendStage === "success" && (
+            <div className="mt-3 rounded-[1rem] bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+              Payment submitted
+            </div>
+          )}
+          <Button
+            onClick={handleSend}
+            size="lg"
+            isLoading={isSending}
+            className="mt-4 w-full"
+          >
+            Send
+          </Button>
+        </section>
 
         <section className="mt-8">
           <div className="mb-3 flex items-center justify-between">
