@@ -152,7 +152,7 @@ export function HomeScreen() {
         <section className="mb-6 rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">Available</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">USDC on Arbitrum</p>
               {isLoadingBalance ? (
                 <Skeleton className="mt-2 h-9 w-28" />
               ) : (
@@ -170,21 +170,24 @@ export function HomeScreen() {
             </button>
           </div>
           {user?.eoaAddress && (
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(user.eoaAddress).then(() => {
-                  setCopiedAddr(true);
-                  setTimeout(() => setCopiedAddr(false), 1600);
-                });
-              }}
-              className="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1.5 text-xs font-mono text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-            >
-              {copiedAddr ? (
-                <><Check size={13} weight="bold" /> Copied</>
-              ) : (
-                <><Copy size={13} weight="bold" /> {shortAddress(user.eoaAddress)}</>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400">Fund USDC on Arbitrum</span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(user.eoaAddress).then(() => {
+                    setCopiedAddr(true);
+                    setTimeout(() => setCopiedAddr(false), 1600);
+                  });
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1.5 text-xs font-mono text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              >
+                {copiedAddr ? (
+                  <><Check size={13} weight="bold" /> Copied</>
+                ) : (
+                  <><Copy size={13} weight="bold" /> {shortAddress(user.eoaAddress)}</>
+                )}
+              </button>
+            </div>
           )}
         </section>
 

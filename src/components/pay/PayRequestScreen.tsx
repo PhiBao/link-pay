@@ -195,7 +195,7 @@ export function PayRequestScreen() {
 
         {hasInsufficientBalance && (
           <div className="mt-4 space-y-2 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-            <p>Send USDC to your wallet to continue.</p>
+            <p>Fund USDC on Arbitrum.</p>
             {user?.eoaAddress && (
               <button
                 onClick={() => {
