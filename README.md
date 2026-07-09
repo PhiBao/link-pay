@@ -6,7 +6,7 @@ Recipients create a payment link with an amount and memo. Payers open the link, 
 
 ## Why This Product
 
-Stablecoin payments are useful, but most crypto payment experiences still expose wallet addresses, chain choices, gas concepts, and uncertain trust cues. That makes a simple request like “pay this invoice” feel technical.
+Stablecoin payments are useful, but most crypto payment experiences still expose wallet addresses, chain choices, gas concepts, and uncertain trust cues. That makes a simple request like "pay this invoice" feel technical.
 
 LinkPay turns that into a familiar flow:
 
@@ -74,14 +74,23 @@ The recipient activity list updates from Supabase, not browser-local storage.
 
 ## System Architecture
 
-LinkPay uses three layers:
-
 ### Wallet and Payment Layer
 
 - Magic email OTP creates the embedded wallet.
 - Magic EVM extension signs EIP-7702 authorization.
 - Particle Universal Account creates and submits the USDC transfer.
 - Arbitrum USDC is the settlement asset.
+
+### Gas Sponsorship
+
+Users do not need ETH to activate LinkPay. The first EIP-7702 delegation transaction is relayed by a funded server wallet:
+
+1. User's Magic wallet signs the EIP-7702 authorization (no gas cost).
+2. The signed authorization is sent to the `/api/delegate` endpoint.
+3. The relay wallet (funded with Arbitrum ETH) submits the Type-4 transaction.
+4. The relay wallet pays the gas, not the user.
+
+Configure the relayer by setting `RELAYER_PRIVATE_KEY` and funding the corresponding address with Arbitrum ETH.
 
 ### Trust Layer
 
@@ -105,6 +114,7 @@ Supabase stores durable state:
 - `payment_requests`: request payload, signature, recipient, amount, status, expiry
 - `payments`: submitted payment receipts and transaction references
 - `notifications`: recipient notification attempts
+- `keepalive_pings`: timestamps used to prevent project pausing (Supabase Free Plan)
 
 Next.js API routes are the only Supabase writers. The browser does not receive the Supabase service role key.
 
@@ -151,6 +161,8 @@ NEXT_PUBLIC_APP_ID=
 # Arbitrum
 NEXT_PUBLIC_ARB_RPC_URL=https://arb1.arbitrum.io/rpc
 NEXT_PUBLIC_BLOCKCHAIN_NETWORK=arbitrum
+NEXT_PUBLIC_CHAIN_ID=42161
+NEXT_PUBLIC_USDC_ADDRESS=0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9
 
 # App URL
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -158,6 +170,10 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
+
+# Gas sponsorship relay (optional) — fund this wallet with Arbitrum ETH
+# to sponsor first-time EIP-7702 delegations so users never need to hold ETH.
+RELAYER_PRIVATE_KEY=
 
 # Optional email notifications
 RESEND_API_KEY=
@@ -189,14 +205,24 @@ Use the project URL as `NEXT_PUBLIC_SUPABASE_URL` and the service role key as `S
 
 ### Keep Supabase Active
 
-The repository includes `.github/workflows/keep-supabase-active.yml`, which queries Supabase every three days and can also be run manually from GitHub Actions. Add these repository secrets after the Supabase migration has been applied:
+The repository includes `.github/workflows/keep-supabase-active.yml`, which inserts a keepalive row into Supabase every day. This prevents the Supabase Free Plan project from being paused after 7 days of inactivity. Add these repository secrets after the Supabase migration has been applied:
 
 ```bash
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-The workflow reads from `payment_requests`, so it will fail until the LinkPay migration exists on the target Supabase project.
+Run the workflow manually from GitHub Actions if the scheduled cron does not fire immediately.
+
+## API Routes
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/delegate` | POST | Relays signed EIP-7702 authorization (gas sponsorship) |
+| `/api/payment-requests` | GET / POST | List or create payment requests |
+| `/api/payment-requests/[id]` | GET | Single payment request details |
+| `/api/payment-requests/[id]/claim` | POST | Claim a request for processing |
+| `/api/payment-requests/[id]/payments` | GET / POST | List or record payments |
 
 ## Local Development
 
@@ -215,7 +241,7 @@ http://localhost:3000
 ## Demo Walkthrough
 
 1. Sign in with email.
-2. Activate LinkPay once.
+2. Activate LinkPay once (relayer sponsors gas — no ETH needed).
 3. Create a USDC request with an amount and memo.
 4. Copy the generated `/pay/:id` link.
 5. Open the link in a clean session.
@@ -231,10 +257,11 @@ pnpm lint
 pnpm build
 ```
 
-Supabase CLI migration file:
+Supabase CLI migration files:
 
 ```bash
-supabase/migrations/20260630141521_linkpay_backend_state.sql
+supabase/migrations/20260630141521_linkpay_backend_state.sql  # core tables
+supabase/migrations/20260701000001_keepalive_pings.sql        # keepalive
 ```
 
 ## Product Direction

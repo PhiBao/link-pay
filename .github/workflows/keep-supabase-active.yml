@@ -2,7 +2,7 @@ name: Keep Supabase Active
 
 on:
   schedule:
-    - cron: "17 9 */3 * *"
+    - cron: "17 9 * * *"
   workflow_dispatch:
 
 jobs:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Query payment request table
+      - name: Insert keepalive ping
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -25,9 +25,12 @@ jobs:
 
           code="$(
             curl --silent --show-error --output /tmp/supabase-ping.json --write-out "%{http_code}" \
-              "${SUPABASE_URL%/}/rest/v1/payment_requests?select=id&limit=1" \
+              "${SUPABASE_URL%/}/rest/v1/keepalive_pings" \
+              -X POST \
+              -H "Content-Type: application/json" \
               -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -d '{}'
           )"
 
           if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then

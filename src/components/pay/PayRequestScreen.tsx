@@ -1,9 +1,12 @@
 "use client";
 
 import { motion } from "motion/react";
+import { useState } from "react";
 import {
   ArrowSquareOut,
+  Check,
   CheckCircle,
+  Copy,
   ShieldCheck,
   WarningCircle,
   X,
@@ -16,6 +19,7 @@ import { shortAddress } from "@/utils/paymentRequest";
 import type { PaymentReceipt } from "@/utils/types";
 
 export function PayRequestScreen() {
+  const [copiedAddress, setCopiedAddress] = useState(false);
   const {
     activeRequest,
     balance,
@@ -25,6 +29,7 @@ export function PayRequestScreen() {
     sendError,
     sendStage,
     sendUSDC,
+    user,
   } = useApp();
 
   if (!activeRequest || !activeRequest.request) {
@@ -189,8 +194,25 @@ export function PayRequestScreen() {
         </div>
 
         {hasInsufficientBalance && (
-          <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-            This account does not have enough USDC available.
+          <div className="mt-4 space-y-2 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+            <p>Send USDC to your wallet to continue.</p>
+            {user?.eoaAddress && (
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(user.eoaAddress).then(() => {
+                    setCopiedAddress(true);
+                    setTimeout(() => setCopiedAddress(false), 1600);
+                  });
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md bg-amber-100/80 px-2.5 py-1.5 text-xs font-mono transition-colors hover:bg-amber-200/80 dark:bg-amber-900/50 dark:hover:bg-amber-800/50"
+              >
+                {copiedAddress ? (
+                  <><Check size={13} weight="bold" /> Copied</>
+                ) : (
+                  <><Copy size={13} weight="bold" /> {shortAddress(user.eoaAddress)}</>
+                )}
+              </button>
+            )}
           </div>
         )}
 

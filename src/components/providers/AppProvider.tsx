@@ -21,6 +21,7 @@ import {
   getAddress,
   getBytes,
   isAddress,
+  JsonRpcProvider,
   Signature,
   type Eip1193Provider,
 } from "ethers";
@@ -369,19 +370,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await magic.evm.switchChain(ARBITRUM_CHAIN_ID);
       const [auth] = await ua.getEIP7702Auth([ARBITRUM_CHAIN_ID]);
 
+      // User signs the EIP-7702 authorization with their Magic EOA key.
+      // The transaction is then relayed by a funded server wallet so the
+      // user never needs to hold ETH for gas.
       const authorization = await magic.wallet.sign7702Authorization({
         contractAddress: auth.address,
         chainId: ARBITRUM_CHAIN_ID,
-        nonce: (auth.nonce ?? 0) + 1,
+        nonce: auth.nonce ?? 0,
       });
 
-      await magic.wallet.send7702Transaction({
-        to: getAddress(user.eoaAddress),
-        data: "0x",
-        authorizationList: [authorization],
+      const relayResponse = await fetch("/api/delegate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userAddress: user.eoaAddress,
+          authorization,
+        }),
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 4000));
+      if (!relayResponse.ok) {
+        const errorPayload = (await relayResponse.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(errorPayload.error || "Delegation relay failed");
+      }
+
+      const relayResult = (await relayResponse.json()) as {
+        transactionHash?: string;
+      };
+
+      const provider = new JsonRpcProvider(
+        process.env.NEXT_PUBLIC_ARB_RPC_URL || "https://arb1.arbitrum.io/rpc",
+      );
+
+      if (relayResult.transactionHash) {
+        await provider.waitForTransaction(relayResult.transactionHash);
+      }
+
+      const eip7702Prefix = "0xef0100";
+      const code = await provider.getCode(user.eoaAddress);
+      if (code.startsWith(eip7702Prefix)) {
+        setDelegationStatus("delegated");
+        return true;
+      }
 
       const deployments = await ua.getEIP7702Deployments();
       const arb = deployments.find(
