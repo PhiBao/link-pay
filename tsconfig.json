@@ -9,6 +9,7 @@
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
+    "customConditions": ["types"],
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
@@ -20,7 +21,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@particle-network/universal-account-sdk": ["./node_modules/@particle-network/universal-account-sdk/dist/index.d.ts"]
+      "@particle-network/universal-account-sdk": ["./node_modules/@particle-network/universal-account-sdk/dist/index.mjs"]
     }
   },
   "include": [

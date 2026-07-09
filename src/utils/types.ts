@@ -1,5 +1,3 @@
-import type { CHAIN_ID, SUPPORTED_TOKEN_TYPE } from "@particle-network/universal-account-sdk";
-
 export type DelegationStatus = "unknown" | "checking" | "delegated" | "not-delegated";
 
 export type SendStage = "idle" | "sending" | "success" | "error";
@@ -95,8 +93,8 @@ export interface PaymentRequestActivityItem {
 }
 
 export interface PrimaryAssetInfo {
-  chainId: CHAIN_ID;
-  type: SUPPORTED_TOKEN_TYPE;
+  chainId: number;
+  type: string;
   amount: string;
   amountInUsd: number;
 }

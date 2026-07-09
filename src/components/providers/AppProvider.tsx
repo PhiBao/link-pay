@@ -15,8 +15,6 @@ import { EVMExtension } from "@magic-ext/evm";
 import {
   UniversalAccount,
   UNIVERSAL_ACCOUNT_VERSION,
-  type CHAIN_ID,
-  type SUPPORTED_TOKEN_TYPE,
 } from "@particle-network/universal-account-sdk";
 import {
   BrowserProvider,
@@ -114,7 +112,7 @@ const MAGIC_API_KEY = usablePublicEnv(process.env.NEXT_PUBLIC_MAGIC_API_KEY);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const magicRef = useRef<MagicInstance | null>(null);
-  const uaRef = useRef<UniversalAccount | null>(null);
+  const uaRef = useRef<InstanceType<typeof UniversalAccount> | null>(null);
   const providerRef = useRef<BrowserProvider | null>(null);
 
   const [isAuthLoading, setIsAuthLoading] = useState(Boolean(MAGIC_API_KEY));
@@ -269,13 +267,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       const assets = await ua.getPrimaryAssets();
-      const total = assets.totalAmountInUSD ?? 0;
-      const mapped = (assets.assets ?? []).map((asset) => ({
-        chainId: (asset.chainAggregation?.[0]?.token?.chainId ??
-          ARBITRUM_CHAIN_ID) as CHAIN_ID,
-        type: asset.tokenType as SUPPORTED_TOKEN_TYPE,
+      const rawAssets = (assets as { assets?: Array<Record<string, unknown>> }).assets ?? [];
+      const total = (assets as { totalAmountInUSD?: number }).totalAmountInUSD ?? 0;
+      const mapped = rawAssets.map((asset) => ({
+        chainId: (
+          Number(
+            (asset.chainAggregation as Array<{ token?: { chainId?: number } }>)?.[0]?.token?.chainId
+          ) || ARBITRUM_CHAIN_ID
+        ) as number,
+        type: asset.tokenType as string,
         amount: String(asset.amount ?? "0"),
-        amountInUsd: (asset.amountInUSD ?? 0) as number,
+        amountInUsd: Number(asset.amountInUSD ?? 0),
       }));
 
       setBalance({

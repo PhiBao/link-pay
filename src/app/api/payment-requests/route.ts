@@ -135,6 +135,7 @@ export async function GET(request: NextRequest) {
       ),
     );
   } catch (error) {
+    console.error("[payment-requests GET] failed:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Could not load payment activity" },
       { status: 500 },
