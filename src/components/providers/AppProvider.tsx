@@ -267,9 +267,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsLoadingBalance(true);
 
     try {
-      const assets = await ua.getPrimaryAssets();
-      const rawAssets = (assets as { assets?: Array<Record<string, unknown>> }).assets ?? [];
-      const total = (assets as { totalAmountInUSD?: number }).totalAmountInUSD ?? 0;
+      const [assetsResult, onChain] = await Promise.all([
+        ua.getPrimaryAssets(),
+        (async () => {
+          try {
+            const provider = new JsonRpcProvider(
+              process.env.NEXT_PUBLIC_ARB_RPC_URL || "https://arb1.arbitrum.io/rpc",
+            );
+            const abi = `0x70a08231${user!.eoaAddress.slice(2).padStart(64, "0")}`;
+            const raw = await provider.call({
+              to: ARBITRUM_USDC_ADDRESS,
+              data: abi,
+            });
+            return Number(BigInt(raw)) / 1e6;
+          } catch {
+            return 0;
+          }
+        })(),
+      ]);
+
+      const rawAssets = (assetsResult as { assets?: Array<Record<string, unknown>> }).assets ?? [];
+      const total = (assetsResult as { totalAmountInUSD?: number }).totalAmountInUSD ?? 0;
       const mapped = rawAssets.map((asset) => ({
         chainId: (
           Number(
@@ -281,18 +299,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
         amountInUsd: Number(asset.amountInUSD ?? 0),
       }));
 
+      if (onChain > 0) {
+        const existing = mapped.find(
+          (a) => a.type === "USDC" && a.chainId === ARBITRUM_CHAIN_ID,
+        );
+        if (existing) {
+          existing.amount = String(onChain);
+        } else {
+          mapped.push({
+            chainId: ARBITRUM_CHAIN_ID,
+            type: "USDC",
+            amount: String(onChain),
+            amountInUsd: onChain,
+          });
+        }
+      }
+
       setBalance({
-        totalAmountInUSD: total,
+        totalAmountInUSD: onChain || total,
         assets: mapped,
       });
-      setBalanceLabel(formatCompactUSD(total));
+      setBalanceLabel(
+        onChain > 0 ? `${onChain.toFixed(2)} USDC` : formatCompactUSD(total),
+      );
     } catch {
       setBalance(null);
       setBalanceLabel("$0.00");
     } finally {
       setIsLoadingBalance(false);
     }
-  }, [delegationStatus]);
+  }, [delegationStatus, user]);
 
   const refreshPaymentActivity = useCallback(async () => {
     if (!user?.eoaAddress) return;
