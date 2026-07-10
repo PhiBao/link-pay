@@ -16,11 +16,12 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Spinner";
 import { formatUSD } from "@/utils/formatCurrency";
-import { normalizePaymentAmount, shortAddress } from "@/utils/paymentRequest";
+import { ARBITRUM_CHAIN_ID, normalizePaymentAmount, shortAddress } from "@/utils/paymentRequest";
 import { isAddress } from "ethers";
 
 export function HomeScreen() {
   const {
+    balance,
     balanceLabel,
     createPaymentRequest,
     isLoadingBalance,
@@ -33,6 +34,14 @@ export function HomeScreen() {
     resetSend,
     user,
   } = useApp();
+
+  const usdcAmount =
+    balance?.assets?.reduce((sum, a) => {
+      if (a.type === "USDC" && a.chainId === ARBITRUM_CHAIN_ID) {
+        return sum + Number(a.amount);
+      }
+      return sum;
+    }, 0) ?? 0;
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [formError, setFormError] = useState("");
@@ -156,9 +165,12 @@ export function HomeScreen() {
               {isLoadingBalance ? (
                 <Skeleton className="mt-2 h-9 w-28" />
               ) : (
-                <p className="mt-1 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-                  {balanceLabel}
-                </p>
+                <>
+                  <p className="mt-1 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+                    {usdcAmount > 0 ? `${usdcAmount.toFixed(2)}` : balanceLabel.replace("$", "")}
+                  </p>
+                  <p className="text-xs text-zinc-400">{balanceLabel}</p>
+                </>
               )}
             </div>
             <button

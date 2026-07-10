@@ -8,7 +8,7 @@ import type {
 export const ARBITRUM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 42161);
 export const ARBITRUM_USDC_ADDRESS =
   process.env.NEXT_PUBLIC_USDC_ADDRESS ||
-  "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9";
+  "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
 export const PAYMENT_REQUEST_PARAM = "pay";
 export const DEFAULT_EXPIRY_HOURS = 72;
 

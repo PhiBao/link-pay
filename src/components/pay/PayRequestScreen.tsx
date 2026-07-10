@@ -1,7 +1,7 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { useState } from "react";
 import {
   ArrowSquareOut,
   Check,
@@ -15,7 +15,7 @@ import { useApp } from "@/components/providers/AppProvider";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatUSD } from "@/utils/formatCurrency";
-import { shortAddress } from "@/utils/paymentRequest";
+import { ARBITRUM_CHAIN_ID, shortAddress } from "@/utils/paymentRequest";
 import type { PaymentReceipt } from "@/utils/types";
 
 export function PayRequestScreen() {
@@ -26,11 +26,21 @@ export function PayRequestScreen() {
     balanceLabel,
     clearActiveRequest,
     lastReceipt,
+    refreshBalance,
     sendError,
     sendStage,
     sendUSDC,
     user,
   } = useApp();
+
+  useEffect(() => { refreshBalance(); }, [refreshBalance]);
+  const [isReleasing, setIsReleasing] = useState(false);
+
+  const handlePay = useCallback(async () => {
+    if (!activeRequest?.request) return;
+    const r = activeRequest.request;
+    await sendUSDC(r.payload.amount, r.payload.recipientAddress, r, activeRequest?.id);
+  }, [activeRequest, sendUSDC]);
 
   if (!activeRequest || !activeRequest.request) {
     return (
@@ -75,12 +85,27 @@ export function PayRequestScreen() {
   const activeRequestId = activeRequest.id;
   const payload = request.payload;
   const amountValue = Number(payload.amount);
+  const usdcAmount =
+    balance?.assets?.reduce((sum, a) => {
+      if (a.type === "USDC" && a.chainId === ARBITRUM_CHAIN_ID) {
+        return sum + Number(a.amount);
+      }
+      return sum;
+    }, 0) ?? 0;
   const hasInsufficientBalance =
-    balance !== null && balance.totalAmountInUSD + 0.000001 < amountValue;
+    balance !== null && usdcAmount + 0.000001 < amountValue;
   const isProcessingElsewhere = activeRequest.backendStatus === "processing";
-
-  async function handlePay() {
-    await sendUSDC(payload.amount, payload.recipientAddress, request, activeRequestId);
+  async function handleRetry() {
+    setIsReleasing(true);
+    try {
+      if (activeRequestId) {
+        await fetch(`/api/payment-requests/${activeRequestId}/release`, { method: "POST" });
+      }
+    } catch {
+      // best-effort
+    }
+    setIsReleasing(false);
+    await handlePay();
   }
 
   if (sendStage === "sending") {
@@ -190,7 +215,10 @@ export function PayRequestScreen() {
           <ReceiptRow label="To" value={payload.recipientLabel} />
           <ReceiptRow label="Wallet" value={shortAddress(payload.recipientAddress)} />
           <ReceiptRow label="Network" value="Arbitrum" />
-          <ReceiptRow label="Available" value={balanceLabel} />
+          <ReceiptRow
+            label="Available"
+            value={usdcAmount > 0 ? `${usdcAmount.toFixed(2)} USDC` : balanceLabel}
+          />
         </div>
 
         {hasInsufficientBalance && (
@@ -217,8 +245,15 @@ export function PayRequestScreen() {
         )}
 
         {isProcessingElsewhere && (
-          <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-            A payment attempt is already in progress for this link.
+          <div className="mt-4 space-y-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+            <p>Previous payment attempt did not complete.</p>
+            <button
+              onClick={handleRetry}
+              disabled={isReleasing}
+              className="inline-flex h-9 items-center rounded-lg bg-amber-200/80 px-4 text-xs font-medium transition-colors hover:bg-amber-300/80 disabled:opacity-50 dark:bg-amber-800/50 dark:hover:bg-amber-700/50"
+            >
+              {isReleasing ? "Releasing…" : "Retry payment"}
+            </button>
           </div>
         )}
 
@@ -235,7 +270,7 @@ export function PayRequestScreen() {
             className="w-full"
             disabled={hasInsufficientBalance || isProcessingElsewhere}
           >
-            Pay {formatUSD(amountValue)}
+            {isProcessingElsewhere ? "In progress" : `Pay ${formatUSD(amountValue)}`}
           </Button>
         </div>
       </div>

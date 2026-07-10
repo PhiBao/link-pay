@@ -570,6 +570,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setTimeout(() => refreshBalance(), 5000);
         return true;
       } catch (e) {
+        if (requestId) {
+          try {
+            await fetch(`/api/payment-requests/${requestId}/release`, { method: "POST" });
+          } catch {
+            // best-effort release
+          }
+        }
         setSendError(e instanceof Error ? e.message : "Send failed");
         setSendStage("error");
         return false;
